@@ -9,7 +9,13 @@
  */
 void execute_with_args(char *full_path, char **args, char **env)
 {
-    pid_t child_pid = fork();
+    char **args_tokens;
+    pid_t child_pid;
+    int i;
+
+    args_tokens = NULL;
+
+    child_pid = fork();
     if (child_pid == -1)
     {
         perror("fork");
@@ -32,7 +38,6 @@ void execute_with_args(char *full_path, char **args, char **env)
         else  /* Arguments provided */
         {
             int num_args = 0;
-            char **args_tokens;
 
             while (args[num_args] != NULL)
                 num_args++;
@@ -45,9 +50,9 @@ void execute_with_args(char *full_path, char **args, char **env)
             }
 
             args_tokens[0] = full_path;
-            for (num_args = 0; args[num_args] != NULL; num_args++)
-                args_tokens[num_args + 1] = args[num_args];
-            args_tokens[num_args + 1] = NULL;
+            for (i = 0; args[i] != NULL; i++)
+                args_tokens[i + 1] = args[i];
+            args_tokens[i + 1] = NULL;
 
             if (execve(full_path, args_tokens, env) == -1)
             {
@@ -66,50 +71,74 @@ void execute_with_args(char *full_path, char **args, char **env)
 
 void execute(char *command, char **env)
 {
+    char ** paths;
+    char *token;
+    int num_args = 0;
+    int i;
+
+    char **args = malloc(sizeof(char *) * 2);
+    args[0] = strtok(command, " ");
+
+    while (args[num_args] != NULL)
+    {
+        num_args++;
+        args[num_args] = strtok(NULL, " ");
+    }
+
     char **paths = get_paths();
 
     if (paths == NULL)
     {
         fprintf(stderr, "Error getting paths\n");
+        free(args);
         return;
     }
 
     printf("Executing command: %s\n", command); /* Debug print */
 
-    if (strchr(command, '/') != NULL || strchr(command, '-') != NULL)
+    args = realloc(args, sizeof(char *) * (num_args + 1));
+    args[num_args] = NULL;
+
+    if (strchr(args[0], '/') != NULL || strchr(args[0], '-') != NULL)
     {
-        char *token = strtok(command, " ");
-        char **args = NULL;
-        int num_args = 0;
-
-        while (token != NULL)
-        {
-            args = realloc(args, sizeof(char *) * (num_args + 2));
-            if (args == NULL)
-            {
-                perror("realloc");
-                free(paths);
-                return;
-            }
-
-            args[num_args] = token;
-            num_args++;
-
-            token = strtok(NULL, " ");
-        }
-        args[num_args] = NULL;
-
         execute_with_args(args[0], args, env);
-
-        free(args);
-        free(paths);
-        return;
     }
     else
     {
-        /* ... (Rest of the code, as before) */
+        int i;
+        for (i = 0; paths[i] != NULL; i++)
+        {
+            char *full_path1;
+
+            full_path1 = malloc(strlen(paths[i]) + strlen(args[0]) + 2);
+            if (full_path1 == NULL)
+            {
+                perror("malloc");
+                free(paths);
+                free(args);
+                return;
+            }
+            sprintf(full_path1, "%s/%s", paths[i], args[0]);
+
+            printf("Full path 1: %s\n", full_path1); /* Debug print */
+
+            if (access(full_path1, X_OK) == 0)
+            {
+                execute_with_args(full_path1, args, env);
+
+                free(full_path1);
+                free(paths);
+                free(args);
+                return;
+            }
+
+            free(full_path1);
+        }
+
+        fprintf(stderr, "Command not found\n");
     }
 
-    fprintf(stderr, "Command not found\n");
     free(paths);
+    free(args);
 }
+
