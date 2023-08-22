@@ -5,7 +5,6 @@
  *
  * @env: The environment variables
  */
-
 void noninteractive_mode(char **env)
 {
 	const size_t BUFFER_SIZE = 1024;
