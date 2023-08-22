@@ -7,60 +7,74 @@
  *
  * @env: The environment variables
  */
-
-void execute(char *command, char **env) {
-    pid_t child_pid;
-    char *token = NULL;
-    char **tokens = NULL;
-    int token_count = 0;
-
-    /* Tokenize the command string */
-    token = strtok(command, " \n");
-    if (token == NULL)
-        return;
-
-    /* Tokenize the command and store tokens in an array */
-    while (token != NULL) {
-        tokens = realloc(tokens, sizeof(char *) * (token_count + 2));
-        if (tokens == NULL) {
-            perror("realloc");
-            return;
-        }
-        tokens[token_count] = token;
-        token_count++;
-        token = strtok(NULL, " \n");
-    }
-    tokens[token_count] = NULL; /* Set the last element to NULL */
-
-    /* Create the child process */
-    child_pid = fork();
-    if (child_pid == -1) {
+void execute_with_args(char *full_path, char **args, char **env)
+{
+    pid_t child_pid = fork();
+    if (child_pid == -1)
+    {
         perror("fork");
-        free(tokens); /* Free allocated memory */
         return;
     }
 
-    if (child_pid == 0) { /* Child process */
-        /* Build the full path to the executable using custom directory structure */
-        char *full_path = malloc(strlen("./my_bin/") + strlen(tokens[0]) + 1);
-        if (full_path == NULL) {
-            perror("malloc");
-            free(tokens); /* Free allocated memory */
-            exit(EXIT_FAILURE); /* Exit child process with failure status */
-        }
-        strcpy(full_path, "./my_bin/");
-        strcat(full_path, tokens[0]);
-
-        /* Execute the command using execve */
-        if (execve(full_path, tokens, env) == -1) {
+    if (child_pid == 0)
+    {
+        if (execve(full_path, args, env) == -1)
+        {
             perror("execve error");
-            free(full_path);
-            free(tokens); /* Free allocated memory */
-            exit(EXIT_FAILURE); /* Exit child process with failure status */
+            exit(EXIT_FAILURE);
         }
-    } else { /* Parent process */
-        /* Wait for the child process to complete */
-        waitpid(child_pid, NULL, 0);
-        free(tokens); /* Free allocated memory */
     }
+    else
+    {
+        waitpid(child_pid, NULL, 0);
+    }
+}
+
+void execute(char *command, char **env)
+{
+    char **paths = get_paths();
+    int i;
+
+    if (paths == NULL)
+    {
+        fprintf(stderr, "Error getting paths\n");
+        return;
+    }
+
+    if (strchr(command, '/') != NULL || strchr(command, '-') != NULL)
+    {
+        execute_with_args(command, NULL, env);
+        free(paths);
+        return;
+    }
+    else
+    {
+        for (i = 0; paths[i] != NULL; i++)
+        {
+            char *full_path1;
+            
+            full_path1 = malloc(strlen(paths[i]) + strlen(command) + 2);
+            if (full_path1 == NULL)
+            {
+                perror("malloc");
+                free(paths);
+                return;
+            }
+            sprintf(full_path1, "%s/%s", paths[i], command);
+
+            if (access(full_path1, X_OK) == 0)
+            {
+                execute_with_args(full_path1, NULL, env);
+
+                free(full_path1);
+                free(paths);
+                return;
+            }
+
+            free(full_path1);
+        }
+    }
+
+    fprintf(stderr, "Command not found\n");
+    free(paths);
 }
