@@ -72,7 +72,6 @@ void execute_with_args(char *full_path, char **args, char **env)
 void execute(char *command, char **env)
 {
     char ** paths;
-    char *token;
     int num_args = 0;
     int i;
 
@@ -85,7 +84,7 @@ void execute(char *command, char **env)
         args[num_args] = strtok(NULL, " ");
     }
 
-    char **paths = get_paths();
+    paths = get_paths();
 
     if (paths == NULL)
     {
@@ -105,7 +104,6 @@ void execute(char *command, char **env)
     }
     else
     {
-        int i;
         for (i = 0; paths[i] != NULL; i++)
         {
             char *full_path1;
@@ -141,4 +139,3 @@ void execute(char *command, char **env)
     free(paths);
     free(args);
 }
-
